@@ -10,6 +10,8 @@ namespace xmlToJson
     class parseKeys
     {
         static List<KeysSet> KeysSets = new List<KeysSet>();
+        static int KnownKeysCount = 0;
+        static int KnownProductCount = 0;
         static List<string> CsvKeys = new List<string>();
         static string CvsHeader = "name,key,type,ClaimedDate,id,note";
 
@@ -30,7 +32,7 @@ namespace xmlToJson
                 var csvFile = $"{direcoryInfo.FullName}\\keys.csv";
                 if (File.Exists(csvFile))
                     ParseCsvFile(csvFile);
-
+                StoreKnownKeys();
                 foreach (var fileInfo in xmlFiles)
                 {
                     var file = fileInfo.FullName;
@@ -44,13 +46,13 @@ namespace xmlToJson
                 }
 
                 Integrate();
-                foreach (var keysSet in KeysSets)
-                {
-                    keysSet.Keys = keysSet.Keys.Distinct().ToList();
-                    keysSet.Products = keysSet.Products.Distinct().OrderBy(x => x).ToList();
-                }
 
-                Console.WriteLine($"parsed {CsvKeys.Count - 1} total keys,\ndistinct keys: {KeysSets.SelectMany(x => x.Keys).Count()}\n{KeysSets.SelectMany(x => x.Products).Count()} disctinct products");
+                var totalKeysCount = KeysSets.SelectMany(x => x.Keys).Distinct().Count();
+                var totalProductCount = KeysSets.SelectMany(x => x.Products).Distinct().Count();
+
+                Console.WriteLine($"total distinct key count: {totalKeysCount} and total distinct product count: {totalProductCount}\n" +
+                    $"found {totalKeysCount - KnownKeysCount} new keys for new {totalProductCount - KnownProductCount} procucts");
+
                 var jsonStr = JsonConvert.SerializeObject(KeysSets, Newtonsoft.Json.Formatting.Indented);
                 var jsonFile = $"{direcoryInfo.FullName}\\keys_{DateTime.Now.ToString("yyyy-dd-MM_HH-mm-ss")}.json";
                 if (File.Exists(jsonFile)) File.Delete(jsonFile);
@@ -66,11 +68,23 @@ namespace xmlToJson
             }
         }
 
+        
+
+        static void StoreKnownKeys()
+        {
+            Integrate();
+            KnownKeysCount = KeysSets.SelectMany(x => x.Keys).Distinct().Count();
+            KnownProductCount = KeysSets.SelectMany(x => x.Products).Distinct().Count();
+        }
+
         static void Integrate()
         {
             var newKeysSets = new List<KeysSet>();
             foreach (var keysSet in KeysSets)
             {
+                keysSet.Keys = keysSet.Keys.Distinct().ToList();
+                keysSet.Products = keysSet.Products.Distinct().OrderBy(x => x).ToList();
+
                 var n = newKeysSets.FirstOrDefault(x => IsListsOverlapping(keysSet.Keys, x.Keys) || IsListsOverlapping(keysSet.Products, x.Products));
                 if (n != null)
                 {
